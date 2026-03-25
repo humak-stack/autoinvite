@@ -3,5 +3,5 @@
 ## Notes: Automatically sends a group invite to someone who whispers you using the prescribed string.
 ## SavedVariables: AutoInviteOptions
 ## Author: Humak
-## Version: 1.01
+## Version: 1.02
 AutoInvite.xml

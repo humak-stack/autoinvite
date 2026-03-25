@@ -1,17 +1,18 @@
 AutoInviteOptions = {};
 local Realm;
 local Player;
-local version = "1.01";
+local version = "0.5";
 local default_invite = "invite";
 
 function AutoInvite_OnLoad()
 	this:RegisterEvent("CHAT_MSG_WHISPER");
 	this:RegisterEvent("PLAYER_ENTERING_WORLD");
-	
+	this:RegisterEvent("RAID_ROSTER_UPDATE");
+
 	SlashCmdList["AutoInvite"] = AutoInvite_SlashHandler;
 	SLASH_AutoInvite1 = "/AutoInvite";
 	SLASH_AutoInvite2 = "/ai";
-	
+
 	DEFAULT_CHAT_FRAME:AddMessage("AutoInvite (redux) v"..version.." loaded. Type /ai for usage.",0,0,1);
 	DEFAULT_CHAT_FRAME:AddMessage("Type \'/ai alist\' to auto invite everyone in the A-list",0,0,1);
 	DEFAULT_CHAT_FRAME:AddMessage("Type \'/ai blist\' to auto invite everyone in the B-list",0,0,1);
@@ -28,11 +29,11 @@ function AutoInvite_InitializeSetup()
 	if(AutoInviteOptions[Realm][Player]["Status"] == nil) then AutoInviteOptions[Realm][Player]["Status"] = "On" end;
 	if(AutoInviteOptions[Realm][Player]["Type"] == nil) then AutoInviteOptions[Realm][Player]["Type"] = "Party" end;
 	if(AutoInviteOptions[Realm][Player]["GuildScan"] == nil) then AutoInviteOptions[Realm][Player]["GuildScan"] = "Off" end;
+	if(AutoInviteOptions[Realm][Player]["VIPList"] == nil) then AutoInviteOptions[Realm][Player]["VIPList"] = {} end;
 	AutoInvite_UpdateGuildScan();
 end
 
 function AutoInvite_OnEvent(event)
-	--DEFAULT_CHAT_FRAME:AddMessage("DEBUG EVENT: "..tostring(event).." arg1="..(arg1 or "nil").." arg2="..(arg2 or "nil"));
 	if(event == "PLAYER_ENTERING_WORLD") then
 		AutoInvite_InitializeSetup();
 	elseif(event == "CHAT_MSG_WHISPER") then
@@ -43,26 +44,45 @@ function AutoInvite_OnEvent(event)
 			if(invite) then AutoInvite_Invite(who) end;
 		end
 	elseif(event == "CHAT_MSG_GUILD") then
-		--DEFAULT_CHAT_FRAME:AddMessage("DEBUG: guild event fired, status="..AutoInviteOptions[Realm][Player]["Status"].." guildscan="..AutoInviteOptions[Realm][Player]["GuildScan"]);
-		--DEFAULT_CHAT_FRAME:AddMessage("DEBUG: arg1="..(arg1 or "nil").." arg2="..(arg2 or "nil"));
 		if(AutoInviteOptions[Realm][Player]["Status"] == "On" and AutoInviteOptions[Realm][Player]["GuildScan"] == "On") then
 			local what = arg1;
 			local who = arg2;
-			--DEFAULT_CHAT_FRAME:AddMessage("DEBUG: checking message: "..(what or "nil").." from: "..(who or "nil"));
 			local invite = AutoInvite_CheckMessage(what);
-			--DEFAULT_CHAT_FRAME:AddMessage("DEBUG: invite result: "..tostring(invite));
 			if(invite) then AutoInvite_Invite(who) end;
+		end
+	elseif(event == "RAID_ROSTER_UPDATE") then
+		if(AutoInviteOptions[Realm][Player]["Status"] == "On") then
+			AutoInvite_CheckRaidForVIPs();
 		end
 	end
 end
 
 function AutoInvite_UpdateGuildScan()
 	if(AutoInviteOptions[Realm][Player]["GuildScan"] == "On") then
-		--DEFAULT_CHAT_FRAME:AddMessage("DEBUG: Registering CHAT_MSG_GUILD on frame: "..AutoInviteFrame:GetName());
 		AutoInviteFrame:RegisterEvent("CHAT_MSG_GUILD");
-		--DEFAULT_CHAT_FRAME:AddMessage("DEBUG: Registration complete");
 	else
 		AutoInviteFrame:UnregisterEvent("CHAT_MSG_GUILD");
+	end
+end
+
+function AutoInvite_IsVIP(name)
+	local vip = AutoInviteOptions[Realm][Player]["VIPList"];
+	local nameLower = string.lower(name);
+	for i = 1, table.getn(vip) do
+		if(string.lower(vip[i]) == nameLower) then
+			return true;
+		end
+	end
+	return false;
+end
+
+function AutoInvite_CheckRaidForVIPs()
+	for i = 1, GetNumRaidMembers() do
+		local name, rank = GetRaidRosterInfo(i);
+		if(name and rank == 0 and AutoInvite_IsVIP(name)) then
+			PromoteToAssistant(name);
+			DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: promoted VIP |c00ffff00"..name.."|r to assistant.");
+		end
 	end
 end
 
@@ -105,7 +125,7 @@ function InviteBList()
 					if(IsPartyLeader()) then InviteByName(BList[j])
 					else return DEFAULT_CHAT_FRAME:AddMessage("Can't invite "..BList[j].." right now, you're not the party leader.") end;
 				elseif(GetNumPartyMembers() == 4)then
-					if(IsPartyLeader()) then 
+					if(IsPartyLeader()) then
 						DEFAULT_CHAT_FRAME:AddMessage("Raid mode enabled: Converting your group to a raid.")
 						ConvertToRaid();
 						InviteByName(BList[j]);
@@ -158,6 +178,49 @@ function AutoInvite_SlashHandler(msg)
 		local keywords = string.sub(msg, 7);
 		AutoInviteOptions[Realm][Player]["InviteExact"] = keywords;
 		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: exact keyword[s] set to: |c00ffff00"..keywords.."|r");
+	elseif(string.sub(msg, 1, 8) == "vip add ") then
+		local name = string.sub(msg, 9);
+		name = string.gsub(name, "^%s*(.-)%s*$", "%1");
+		if(name ~= "") then
+			name = string.upper(string.sub(name, 1, 1))..string.sub(name, 2);
+			local vip = AutoInviteOptions[Realm][Player]["VIPList"];
+			if(AutoInvite_IsVIP(name)) then
+				DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: |c00ffff00"..name.."|r is already on the VIP list.");
+			else
+				table.insert(vip, name);
+				DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: added |c00ffff00"..name.."|r to VIP list.");
+			end
+		end
+	elseif(string.sub(msg, 1, 11) == "vip remove ") then
+		local name = string.sub(msg, 12);
+		name = string.gsub(name, "^%s*(.-)%s*$", "%1");
+		name = string.upper(string.sub(name, 1, 1))..string.sub(name, 2);
+		local vip = AutoInviteOptions[Realm][Player]["VIPList"];
+		local found = false;
+		for i = 1, table.getn(vip) do
+			if(string.lower(vip[i]) == string.lower(name)) then
+				table.remove(vip, i);
+				DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: removed |c00ffff00"..name.."|r from VIP list.");
+				found = true;
+				break;
+			end
+		end
+		if(not found) then
+			DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: |c00ffff00"..name.."|r was not on the VIP list.");
+		end
+	elseif(msg == "vip list") then
+		local vip = AutoInviteOptions[Realm][Player]["VIPList"];
+		if(table.getn(vip) == 0) then
+			DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: VIP list is empty.");
+		else
+			DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: VIP list:");
+			for i = 1, table.getn(vip) do
+				DEFAULT_CHAT_FRAME:AddMessage("  |c00ffff00"..vip[i].."|r");
+			end
+		end
+	elseif(msg == "vip clear") then
+		AutoInviteOptions[Realm][Player]["VIPList"] = {};
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: VIP list cleared.");
 	elseif(msg == "alist") then
 		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: Starting Invites of Priority List.",1,1,1);
 		InviteAList();
@@ -172,7 +235,7 @@ end
 function AutoInvite_CheckMessage(what)
 	local msg = string.lower(what);
 
-	-- check exists list first
+	-- check exists list
 	local existsKeywords = AutoInviteOptions[Realm][Player]["Invite"];
 	if(existsKeywords ~= nil and existsKeywords ~= "") then
 		for keyword in string.gfind(existsKeywords, "[^,]+") do
@@ -203,7 +266,7 @@ function AutoInvite_Invite(who)
 	if(gtype == "Party") then
 		numgroup = GetNumPartyMembers();
 		if((IsPartyLeader() and numgroup < 4) or (numgroup == 0)) then InviteByName(who)
-		else 
+		else
 			if(numgroup >= 4) then return DEFAULT_CHAT_FRAME:AddMessage("Can't invite "..who.." right now, party is full.");
 			else return DEFAULT_CHAT_FRAME:AddMessage("Can't invite "..who.." right now, you're not the party leader.") end;
 		end
@@ -216,7 +279,7 @@ function AutoInvite_Invite(who)
 				if(IsPartyLeader()) then InviteByName(who)
 				else return DEFAULT_CHAT_FRAME:AddMessage("Can't invite "..who.." right now, you're not the party leader.") end;
 			elseif(GetNumPartyMembers() == 4)then
-				if(IsPartyLeader()) then 
+				if(IsPartyLeader()) then
 					DEFAULT_CHAT_FRAME:AddMessage("Raid mode enabled: Converting your group to a raid.")
 					ConvertToRaid();
 					InviteByName(who);
