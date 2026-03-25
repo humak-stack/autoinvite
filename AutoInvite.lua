@@ -1,7 +1,7 @@
 AutoInviteOptions = {};
 local Realm;
 local Player;
-local version = "0.5";
+local version = "1.01";
 local default_invite = "invite";
 
 function AutoInvite_OnLoad()
@@ -24,6 +24,7 @@ function AutoInvite_InitializeSetup()
 	if(AutoInviteOptions[Realm] == nil) then AutoInviteOptions[Realm] = {} end;
 	if(AutoInviteOptions[Realm][Player] == nil) then AutoInviteOptions[Realm][Player] = {} end;
 	if(AutoInviteOptions[Realm][Player]["Invite"] == nil) then AutoInviteOptions[Realm][Player]["Invite"] = default_invite end;
+	if(AutoInviteOptions[Realm][Player]["InviteExact"] == nil) then AutoInviteOptions[Realm][Player]["InviteExact"] = "" end;
 	if(AutoInviteOptions[Realm][Player]["Status"] == nil) then AutoInviteOptions[Realm][Player]["Status"] = "On" end;
 	if(AutoInviteOptions[Realm][Player]["Type"] == nil) then AutoInviteOptions[Realm][Player]["Type"] = "Party" end;
 	if(AutoInviteOptions[Realm][Player]["GuildScan"] == nil) then AutoInviteOptions[Realm][Player]["GuildScan"] = "Off" end;
@@ -125,50 +126,74 @@ function AutoInvite_SlashHandler(msg)
 	if(msg ~= "") then msg = string.lower(msg) end;
 	if(msg == "" or msg == "status") then
 		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite status: |c00ffff00"..AutoInviteOptions[Realm][Player]["Status"].."|r (change with /ai on | off)");
-		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite keyword[s]: |c00ffff00"..AutoInviteOptions[Realm][Player]["Invite"].."|r (change with /ai text, comma-separated ok)");
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite exists keyword[s]: |c00ffff00"..AutoInviteOptions[Realm][Player]["Invite"].."|r (change with /ai exists <keywords>)");
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite exact keyword[s]: |c00ffff00"..AutoInviteOptions[Realm][Player]["InviteExact"].."|r (change with /ai exact <keywords>)");
 		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite party type: |c00ffff00"..AutoInviteOptions[Realm][Player]["Type"].."|r (change with /ai party | raid)");
 		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite guild chat scan: |c00ffff00"..AutoInviteOptions[Realm][Player]["GuildScan"].."|r (change with /ai guild on | guild off)");
-	elseif(msg == "on") then 
+	elseif(msg == "on") then
 		AutoInviteOptions[Realm][Player]["Status"] = "On";
-		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: Now issuing automatic invites on keyword[s]: |c00ffff00"..AutoInviteOptions[Realm][Player]["Invite"].."|r");
-	elseif(msg == "off") then 
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: enabled.");
+	elseif(msg == "off") then
 		AutoInviteOptions[Realm][Player]["Status"] = "Off";
-		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: No longer issuing automatic invites." ,1,1,1);
-	elseif(msg == "party") then 
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: disabled.",1,1,1);
+	elseif(msg == "party") then
 		AutoInviteOptions[Realm][Player]["Type"] = "Party";
-		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: Invite checking for 5-man party only." ,1,1,1);
-	elseif(msg == "raid") then 
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: Invite checking for 5-man party only.",1,1,1);
+	elseif(msg == "raid") then
 		AutoInviteOptions[Realm][Player]["Type"] = "Raid";
-		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: Invite checking for 40-man raid groups." ,1,1,1);
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: Invite checking for 40-man raid groups.",1,1,1);
 	elseif(msg == "guild on") then
 		AutoInviteOptions[Realm][Player]["GuildScan"] = "On";
 		AutoInvite_UpdateGuildScan();
-		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: Now scanning guild chat for invite keyword[s]." ,1,1,1);
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: Now scanning guild chat for invite keyword[s].",1,1,1);
 	elseif(msg == "guild off") then
 		AutoInviteOptions[Realm][Player]["GuildScan"] = "Off";
 		AutoInvite_UpdateGuildScan();
-		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: No longer scanning guild chat." ,1,1,1);
-	elseif(msg == "alist") then 
-		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: Starting Invites of Priority List." ,1,1,1);
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: No longer scanning guild chat.",1,1,1);
+	elseif(string.sub(msg, 1, 7) == "exists ") then
+		local keywords = string.sub(msg, 8);
+		AutoInviteOptions[Realm][Player]["Invite"] = keywords;
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: exists keyword[s] set to: |c00ffff00"..keywords.."|r");
+	elseif(string.sub(msg, 1, 6) == "exact ") then
+		local keywords = string.sub(msg, 7);
+		AutoInviteOptions[Realm][Player]["InviteExact"] = keywords;
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: exact keyword[s] set to: |c00ffff00"..keywords.."|r");
+	elseif(msg == "alist") then
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: Starting Invites of Priority List.",1,1,1);
 		InviteAList();
-	elseif(msg == "blist") then 
-		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: Starting Invites of Secondary List." ,1,1,1);
+	elseif(msg == "blist") then
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: Starting Invites of Secondary List.",1,1,1);
 		InviteBList();
-	else 
-		AutoInviteOptions[Realm][Player]["Invite"] = msg;
-		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: keyword[s] set to: |c00ffff00"..AutoInviteOptions[Realm][Player]["Invite"].."|r (comma-separated ok)");
+	else
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: unknown command. Type /ai status for info.",1,0,0);
 	end
 end
 
 function AutoInvite_CheckMessage(what)
 	local msg = string.lower(what);
-	local keywords = AutoInviteOptions[Realm][Player]["Invite"];
-	for keyword in string.gfind(keywords, "[^,]+") do
-		keyword = string.gsub(keyword, "^%s*(.-)%s*$", "%1");
-		if(keyword ~= "" and string.find(msg, keyword, 1, true)) then
-			return true;
+
+	-- check exists list first
+	local existsKeywords = AutoInviteOptions[Realm][Player]["Invite"];
+	if(existsKeywords ~= nil and existsKeywords ~= "") then
+		for keyword in string.gfind(existsKeywords, "[^,]+") do
+			keyword = string.gsub(keyword, "^%s*(.-)%s*$", "%1");
+			if(keyword ~= "" and string.find(msg, keyword, 1, true)) then
+				return true;
+			end
 		end
 	end
+
+	-- check exact list
+	local exactKeywords = AutoInviteOptions[Realm][Player]["InviteExact"];
+	if(exactKeywords ~= nil and exactKeywords ~= "") then
+		for keyword in string.gfind(exactKeywords, "[^,]+") do
+			keyword = string.gsub(keyword, "^%s*(.-)%s*$", "%1");
+			if(keyword ~= "" and msg == keyword) then
+				return true;
+			end
+		end
+	end
+
 	return false;
 end
 
