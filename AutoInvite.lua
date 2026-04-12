@@ -3,11 +3,25 @@ local Realm;
 local Player;
 local version = "0.5";
 local default_invite = "invite";
+local convertRaidTimer = nil;
+local timerFrame = CreateFrame("Frame");
+
+timerFrame:SetScript("OnUpdate", function()
+	if convertRaidTimer then
+		convertRaidTimer = convertRaidTimer - arg1;
+		if convertRaidTimer <= 0 then
+			convertRaidTimer = nil;
+			DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: converting party to raid.");
+			ConvertToRaid();
+		end
+	end
+end);
 
 function AutoInvite_OnLoad()
 	this:RegisterEvent("CHAT_MSG_WHISPER");
 	this:RegisterEvent("PLAYER_ENTERING_WORLD");
 	this:RegisterEvent("RAID_ROSTER_UPDATE");
+	this:RegisterEvent("PARTY_MEMBERS_CHANGED");
 
 	SlashCmdList["AutoInvite"] = AutoInvite_SlashHandler;
 	SLASH_AutoInvite1 = "/AutoInvite";
@@ -30,6 +44,7 @@ function AutoInvite_InitializeSetup()
 	if(AutoInviteOptions[Realm][Player]["Type"] == nil) then AutoInviteOptions[Realm][Player]["Type"] = "Party" end;
 	if(AutoInviteOptions[Realm][Player]["GuildScan"] == nil) then AutoInviteOptions[Realm][Player]["GuildScan"] = "Off" end;
 	if(AutoInviteOptions[Realm][Player]["VIPList"] == nil) then AutoInviteOptions[Realm][Player]["VIPList"] = {} end;
+	if(AutoInviteOptions[Realm][Player]["AutoRaid"] == nil) then AutoInviteOptions[Realm][Player]["AutoRaid"] = "Off" end;
 	AutoInvite_UpdateGuildScan();
 end
 
@@ -50,6 +65,11 @@ function AutoInvite_OnEvent(event)
 			local invite = AutoInvite_CheckMessage(what);
 			if(invite) then AutoInvite_Invite(who) end;
 		end
+	elseif(event == "PARTY_MEMBERS_CHANGED") then
+		AutoInvite_CheckAutoRaid();
+		if(AutoInviteOptions[Realm][Player] and AutoInviteOptions[Realm][Player]["Status"] == "On") then
+			AutoInvite_CheckRaidForVIPs();
+		end
 	elseif(event == "RAID_ROSTER_UPDATE") then
 		if(AutoInviteOptions[Realm][Player]["Status"] == "On") then
 			AutoInvite_CheckRaidForVIPs();
@@ -65,6 +85,48 @@ function AutoInvite_UpdateGuildScan()
 	end
 end
 
+function AutoInvite_CheckAutoRaid()
+	if(AutoInviteOptions[Realm][Player]["AutoRaid"] ~= "On") then 
+		return 
+	end;
+	if(GetNumRaidMembers() > 0) then 
+		
+		return 
+	end;
+	if(GetNumPartyMembers() == 0) then 
+		return end;
+	-- check leader via name comparison
+	local isLeader = false;
+	if UnitIsPartyLeader("player") then
+		isLeader = true;
+	else
+		for i = 1, GetNumPartyMembers() do
+			if UnitIsPartyLeader("party"..i) then
+				-- someone else is leader
+			end
+		end
+	end
+	if(not isLeader) then 
+		return 
+	
+	end;
+
+	-- delay the conversion slightly to let the client settle
+	convertRaidTimer = 0.5;
+	AutoInviteFrame:SetScript("OnUpdate", function()
+		if convertRaidTimer then
+			convertRaidTimer = convertRaidTimer - arg1;
+			if convertRaidTimer <= 0 then
+				convertRaidTimer = nil;
+				AutoInviteFrame:SetScript("OnUpdate", nil);
+				DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: converting party to raid.");
+				ConvertToRaid();
+			end
+		end
+	end);
+
+end
+
 function AutoInvite_IsVIP(name)
 	local vip = AutoInviteOptions[Realm][Player]["VIPList"];
 	local nameLower = string.lower(name);
@@ -77,6 +139,8 @@ function AutoInvite_IsVIP(name)
 end
 
 function AutoInvite_CheckRaidForVIPs()
+	if(not IsRaidLeader() and not IsPartyLeader()) then return end;
+
 	for i = 1, GetNumRaidMembers() do
 		local name, rank = GetRaidRosterInfo(i);
 		if(name and rank == 0 and AutoInvite_IsVIP(name)) then
@@ -149,7 +213,8 @@ function AutoInvite_SlashHandler(msg)
 		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite exists keyword[s]: |c00ffff00"..AutoInviteOptions[Realm][Player]["Invite"].."|r (change with /ai exists <keywords>)");
 		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite exact keyword[s]: |c00ffff00"..AutoInviteOptions[Realm][Player]["InviteExact"].."|r (change with /ai exact <keywords>)");
 		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite party type: |c00ffff00"..AutoInviteOptions[Realm][Player]["Type"].."|r (change with /ai party | raid)");
-		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite guild chat scan: |c00ffff00"..AutoInviteOptions[Realm][Player]["GuildScan"].."|r (change with /ai guild on | guild off)");
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite guild chat scan: |c00ffff00"..AutoInviteOptions[Realm][Player]["GuildScan"].."|r (change with /ai guild on | off | toggle)");
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite auto-raid: |c00ffff00"..AutoInviteOptions[Realm][Player]["AutoRaid"].."|r (change with /ai autoraid on | off | toggle)");
 	elseif(msg == "on") then
 		AutoInviteOptions[Realm][Player]["Status"] = "On";
 		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: enabled.");
@@ -165,11 +230,35 @@ function AutoInvite_SlashHandler(msg)
 	elseif(msg == "guild on") then
 		AutoInviteOptions[Realm][Player]["GuildScan"] = "On";
 		AutoInvite_UpdateGuildScan();
-		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: Now scanning guild chat for invite keyword[s].",1,1,1);
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: guild chat scanning enabled.",1,1,1);
 	elseif(msg == "guild off") then
 		AutoInviteOptions[Realm][Player]["GuildScan"] = "Off";
 		AutoInvite_UpdateGuildScan();
-		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: No longer scanning guild chat.",1,1,1);
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: guild chat scanning disabled.",1,1,1);
+	elseif(msg == "guild toggle") then
+		if(AutoInviteOptions[Realm][Player]["GuildScan"] == "On") then
+			AutoInviteOptions[Realm][Player]["GuildScan"] = "Off";
+			AutoInvite_UpdateGuildScan();
+			DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: guild chat scanning disabled.",1,1,1);
+		else
+			AutoInviteOptions[Realm][Player]["GuildScan"] = "On";
+			AutoInvite_UpdateGuildScan();
+			DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: guild chat scanning enabled.",1,1,1);
+		end
+	elseif(msg == "autoraid on") then
+		AutoInviteOptions[Realm][Player]["AutoRaid"] = "On";
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: auto-raid conversion enabled.",1,1,1);
+	elseif(msg == "autoraid off") then
+		AutoInviteOptions[Realm][Player]["AutoRaid"] = "Off";
+		DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: auto-raid conversion disabled.",1,1,1);
+	elseif(msg == "autoraid toggle") then
+		if(AutoInviteOptions[Realm][Player]["AutoRaid"] == "On") then
+			AutoInviteOptions[Realm][Player]["AutoRaid"] = "Off";
+			DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: auto-raid conversion disabled.",1,1,1);
+		else
+			AutoInviteOptions[Realm][Player]["AutoRaid"] = "On";
+			DEFAULT_CHAT_FRAME:AddMessage("AutoInvite: auto-raid conversion enabled.",1,1,1);
+		end
 	elseif(string.sub(msg, 1, 7) == "exists ") then
 		local keywords = string.sub(msg, 8);
 		AutoInviteOptions[Realm][Player]["Invite"] = keywords;
