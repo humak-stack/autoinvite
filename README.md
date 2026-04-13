@@ -1,7 +1,7 @@
 # AutoInvite (redux)
-**Version 1.02 — World of Warcraft 1.12 Addon**
+**Version 0.5 — World of Warcraft 1.12 Addon**
 
-Automatically invite players who whisper or type a keyword in guild chat. Supports comma-separated keyword lists, two matching modes, party/raid auto-management, VIP auto-promotion, and bulk invite lists.
+Automatically invite players who whisper or type a keyword in guild chat. Supports comma-separated keyword lists, two matching modes, party/raid auto-management, VIP auto-promotion, auto raid conversion, and bulk invite lists.
 
 ---
 
@@ -14,6 +14,7 @@ Automatically invite players who whisper or type a keyword in guild chat. Suppor
 - **Exact mode** — only match if the entire message equals the keyword
 - **Both modes active simultaneously** — exists and exact lists work independently at the same time
 - **VIP list** — automatically promote specific players to raid assistant when they join
+- **Auto-raid conversion** — automatically convert party to raid when any member joins, if you are leader
 - **Party & Raid support** — auto-converts party to raid when full
 - **A-List / B-List** — bulk invite predefined priority player lists
 - **Per-character settings** — saved per realm and character name
@@ -58,6 +59,15 @@ Both lists are always active at the same time. A message only needs to match eit
 |---------|-------------|
 | `/ai guild on` | Start scanning guild chat for keywords |
 | `/ai guild off` | Stop scanning guild chat |
+| `/ai guild toggle` | Toggle guild chat scanning — macro friendly |
+
+### Auto-Raid Conversion
+
+| Command | Description |
+|---------|-------------|
+| `/ai autoraid on` | Enable auto party-to-raid conversion |
+| `/ai autoraid off` | Disable auto party-to-raid conversion |
+| `/ai autoraid toggle` | Toggle auto-raid conversion — macro friendly |
 
 ### VIP List
 
@@ -123,9 +133,28 @@ All matching is case-insensitive. `INV`, `Inv`, and `inv` are treated the same.
 
 ---
 
+## Auto-Raid Conversion
+
+When enabled, the addon automatically converts your party to a raid whenever a player joins your group — as long as you are the party leader. The conversion is delayed slightly to ensure the client has fully processed the roster change before converting.
+
+```
+/ai autoraid on
+/ai autoraid off
+/ai autoraid toggle    -- great for macros
+```
+
+**Notes:**
+- Only fires when you are the party leader
+- Only converts if not already in a raid
+- Only converts if at least one other player is in the party
+- Runs independently of the main AutoInvite on/off status
+- Uses a small timer delay to ensure reliable conversion
+
+---
+
 ## VIP List
 
-Players on the VIP list are automatically promoted to **raid assistant** when they join the group. Promotion is triggered any time the raid roster changes — the addon checks all current members against the VIP list and promotes any that are not already assistant or higher.
+Players on the VIP list are automatically promoted to **raid assistant** when they join the group. The addon checks all current members against the VIP list any time the raid roster changes and promotes any that are not already assistant or higher.
 
 ```
 /ai vip add Humak
@@ -135,6 +164,7 @@ Players on the VIP list are automatically promoted to **raid assistant** when th
 
 **Notes:**
 - VIP promotion only fires when AutoInvite is enabled (`/ai on`)
+- Only fires when you are raid leader or party leader
 - Players already at assistant or raid leader rank are not re-promoted
 - The VIP list is saved per character and persists across sessions
 - Names are case-insensitive when adding and removing
@@ -175,6 +205,24 @@ Guild chat scanning is **off by default**. When enabled, the same keyword lists 
 ```
 /ai guild on
 /ai guild off
+/ai guild toggle
+```
+
+---
+
+## Macros
+
+Several commands support `toggle` for easy macro use:
+
+```
+/ai guild toggle
+/ai autoraid toggle
+```
+
+Example macro to toggle both at once:
+```
+/ai guild toggle
+/ai autoraid toggle
 ```
 
 ---
@@ -186,7 +234,8 @@ Guild chat scanning is **off by default**. When enabled, the same keyword lists 
 /ai on / off              enable or disable
 /ai exists <list>         set exists-mode keywords (comma-separated)
 /ai exact <list>          set exact-mode keywords (comma-separated)
-/ai guild on / off        toggle guild chat scanning
+/ai guild on/off/toggle   toggle guild chat scanning
+/ai autoraid on/off/toggle  toggle auto party-to-raid conversion
 /ai party / raid          set group type
 /ai vip add <name>        add player to VIP auto-promote list
 /ai vip remove <name>     remove player from VIP list
