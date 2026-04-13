@@ -1,7 +1,7 @@
 # AutoInvite (redux)
-**Version 0.5 — World of Warcraft 1.12 Addon**
+**Version 1.02 — World of Warcraft 1.12 Addon**
 
-Automatically invite players who whisper or type a keyword in guild chat. Supports comma-separated keyword lists, two matching modes, party/raid auto-management, and bulk invite lists.
+Automatically invite players who whisper or type a keyword in guild chat. Supports comma-separated keyword lists, two matching modes, party/raid auto-management, VIP auto-promotion, and bulk invite lists.
 
 ---
 
@@ -12,6 +12,8 @@ Automatically invite players who whisper or type a keyword in guild chat. Suppor
 - **Comma-separated keyword lists** — set multiple keywords in one command
 - **Exists mode** — match keyword anywhere in the message
 - **Exact mode** — only match if the entire message equals the keyword
+- **Both modes active simultaneously** — exists and exact lists work independently at the same time
+- **VIP list** — automatically promote specific players to raid assistant when they join
 - **Party & Raid support** — auto-converts party to raid when full
 - **A-List / B-List** — bulk invite predefined priority player lists
 - **Per-character settings** — saved per realm and character name
@@ -43,10 +45,12 @@ All commands use `/AutoInvite` or the shorthand `/ai`.
 
 ### Keyword Modes
 
+Both lists are always active at the same time. A message only needs to match either list to trigger an invite.
+
 | Command | Description |
 |---------|-------------|
-| `/ai exists <keywords>` | Match keyword anywhere in the message |
-| `/ai exact <keywords>` | Message must exactly equal the keyword |
+| `/ai exists <keywords>` | Set exists-mode keywords (comma-separated) |
+| `/ai exact <keywords>` | Set exact-mode keywords (comma-separated) |
 
 ### Guild Chat
 
@@ -54,6 +58,15 @@ All commands use `/AutoInvite` or the shorthand `/ai`.
 |---------|-------------|
 | `/ai guild on` | Start scanning guild chat for keywords |
 | `/ai guild off` | Stop scanning guild chat |
+
+### VIP List
+
+| Command | Description |
+|---------|-------------|
+| `/ai vip add <name>` | Add a player to the VIP list |
+| `/ai vip remove <name>` | Remove a player from the VIP list |
+| `/ai vip list` | Show all players on the VIP list |
+| `/ai vip clear` | Clear the entire VIP list |
 
 ### Bulk Invite
 
@@ -94,15 +107,37 @@ The entire message must equal one of the keywords exactly. Case-insensitive.
 | `inv me please` | ❌ No match |
 | `invite` | ❌ No match |
 
+### Running Both Modes Together
+Both lists are checked on every message. You can use exists for common shorthand and exact for specific phrases you only want to match precisely.
+
+```
+/ai exists inv,come,join
+/ai exact harder daddy,i have a small dick,masturbatorium
+```
+
 ### Multi-Word Phrases
 Both modes support multi-word phrases. The comma is the only delimiter — spaces are not split on.
 
+### Case Sensitivity
+All matching is case-insensitive. `INV`, `Inv`, and `inv` are treated the same.
+
+---
+
+## VIP List
+
+Players on the VIP list are automatically promoted to **raid assistant** when they join the group. Promotion is triggered any time the raid roster changes — the addon checks all current members against the VIP list and promotes any that are not already assistant or higher.
+
 ```
-/ai exists harder daddy,i have a small dick,masturbatorium
+/ai vip add Humak
+/ai vip add Brewmaster
+/ai vip list
 ```
 
-### Case Sensitivity
-All matching is case-insensitive. `INV`, `Inv`, and `inv` are all treated the same.
+**Notes:**
+- VIP promotion only fires when AutoInvite is enabled (`/ai on`)
+- Players already at assistant or raid leader rank are not re-promoted
+- The VIP list is saved per character and persists across sessions
+- Names are case-insensitive when adding and removing
 
 ---
 
@@ -135,7 +170,7 @@ Edit `PriorityList.lua` to define your priority players. The addon will invite t
 
 ## Guild Chat Scanning
 
-Guild chat scanning is **off by default**. When enabled, the same keyword list and mode used for whispers applies to guild chat. The setting persists across sessions and is restored automatically on login.
+Guild chat scanning is **off by default**. When enabled, the same keyword lists used for whispers apply to guild chat. The setting persists across sessions and is restored automatically on login.
 
 ```
 /ai guild on
@@ -147,12 +182,16 @@ Guild chat scanning is **off by default**. When enabled, the same keyword list a
 ## Quick Reference
 
 ```
-/ai                   show status
-/ai on / off          enable or disable
-/ai exists <list>     set exists-mode keywords (comma-separated)
-/ai exact <list>      set exact-mode keywords (comma-separated)
-/ai guild on / off    toggle guild chat scanning
-/ai party / raid      set group type
-/ai alist             bulk invite A-List
-/ai blist             bulk invite B-List
+/ai                       show status
+/ai on / off              enable or disable
+/ai exists <list>         set exists-mode keywords (comma-separated)
+/ai exact <list>          set exact-mode keywords (comma-separated)
+/ai guild on / off        toggle guild chat scanning
+/ai party / raid          set group type
+/ai vip add <name>        add player to VIP auto-promote list
+/ai vip remove <name>     remove player from VIP list
+/ai vip list              show VIP list
+/ai vip clear             clear VIP list
+/ai alist                 bulk invite A-List
+/ai blist                 bulk invite B-List
 ```
